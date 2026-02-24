@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum MatchResult {
+  HOME_WIN
+  DRAW
+  AWAY_WIN
+}
+
+enum PredictionOutcome {
+  HOME_WIN
+  DRAW
+  AWAY_WIN
+}
+
+model Profile {
+  id          String   @id
+  username    String   @unique
+  skillRating Int      @default(1200)
+  lastActiveAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  predictions   Prediction[]
+  seasonStats   SeasonStat[]
+}
+
+model League {
+  id          String   @id @default(cuid())
+  name        String
+  countryCode String?
+  teams       Team[]
+  matches     Match[]
+}
+
+model Team {
+  id         String   @id @default(cuid())
+  name       String
+  eloRating  Int      @default(1500)
+  leagueId   String
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+}
+
+model Season {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  matches   Match[]
+  stats     SeasonStat[]
+}
+
+model Match {
+  id              String       @id @default(cuid())
+  homeTeamId      String
+  awayTeamId      String
+  homeEloSnapshot Int
+  awayEloSnapshot Int
+  homeProb        Float
+  drawProb        Float
+  awayProb        Float
+  multiplierHome   Float
+  multiplierDraw  Float
+  multiplierAway  Float
+  matchDatetime   DateTime
+  result          MatchResult?
+  leagueId        String
+  seasonId        String
+
+  homeTeam   Team       @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam   Team       @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  league     League     @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  season     Season     @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  predictions Prediction[]
+
+  @@index([matchDatetime, result])
+  @@index([seasonId])
+}
+
+model Prediction {
+  id               String            @id @default(cuid())
+  userId           String
+  matchId          String
+  selectedOutcome  PredictionOutcome
+  confidenceUsed   Int
+  multiplierSnapshot Float
+  pointsEarned    Float?
+  resolved        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match  Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
+  @@index([matchId])
+}
+
+model SeasonStat {
+  id          String   @id @default(cuid())
+  userId      String
+  seasonId    String
+  totalPoints Float    @default(0)
+  rank        Int?
+
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seasonId])
+}
