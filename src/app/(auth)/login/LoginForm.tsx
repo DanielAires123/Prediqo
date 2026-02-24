@@ -22,12 +22,22 @@ export function LoginForm() {
     setLoading(true);
     const supabase = createClient();
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
     if (err) {
+      setLoading(false);
       setError(err.message);
       return;
     }
-    window.location.href = next;
+    // Ensure session is in cookies before redirect so middleware sees it
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      setError("Session not ready. Try again.");
+      return;
+    }
+    setLoading(false);
+    const redirectTo = (next ?? "/dashboard").trim() || "/dashboard";
+    await new Promise((r) => setTimeout(r, 100));
+    window.location.href = redirectTo;
   }
 
   return (
